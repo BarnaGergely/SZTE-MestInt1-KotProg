@@ -43,9 +43,12 @@ További segédletek a kötelező programhoz: https://barnagergely.github.io/kal
  * */
 
 /*TODO:
- * Javítani a kód minőségét
- * Rájönni miért lassú
+ + Javítani a kód minőségét
+ + Rájönni miért lassú
  * Optimalizálni a heurisztikákat
+    * Megnézni a videóban milyen gyorsítási lehetőséget ajánlottak
+    * Hozzá adni Coin heurisztikát
+ * Optimalizálni a listák tipusait
  * Vektorizálni
  *
  *
@@ -83,11 +86,10 @@ public class Agent extends RaceTrackPlayer {
 
     private static class Node implements Comparable<Node> {
         Cell cell;
-        private Node parent;
-        int numberOfParents = 0;
+        Node parent;
 
         /// Sum of costs
-        double fCost = Double.MAX_VALUE;
+        private double fCost = Double.MAX_VALUE;
 
         double hCost = Double.MAX_VALUE;
 
@@ -99,22 +101,9 @@ public class Agent extends RaceTrackPlayer {
 
         double cCost = 0;
 
-        public void setParent(Node parent) {
-            this.parent = parent;
-            if (this.parent == null) {
-                numberOfParents = 0;
-            } else {
-                this.numberOfParents = parent.numberOfParents + (int) this.wCost;
-            }
-        }
-
-        public Node getParent() {
-            return parent;
-        }
-
         public Node(Cell cell, Node parent) {
             this.cell = cell;
-            setParent(parent);
+            this.parent = parent;
         }
 
         public Node(int i, int j, Node parent) {
@@ -131,7 +120,6 @@ public class Agent extends RaceTrackPlayer {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Node node = (Node) o;
-            // TODO: Mikor egyenlő két node?
             return cell.same(node.cell);
         }
 
@@ -203,7 +191,7 @@ public class Agent extends RaceTrackPlayer {
     }
 
 
-    /// octile distance calculator: https://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
+    /// calculate octile distance: https://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
     double octileDistance(Cell a, Cell b) {
         int C = 1;
         double D = Math.sqrt(2);
@@ -213,6 +201,7 @@ public class Agent extends RaceTrackPlayer {
         return value;
     }
 
+    /// chebyshev octile distance: https://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
     double chebyshevDistance(Cell a, Cell b) {
         int C = 1;
         double D = 1;
@@ -222,11 +211,12 @@ public class Agent extends RaceTrackPlayer {
         return value;
     }
 
-
+    /// A megadott algoritmussal kiszámolja az egyenes út hosszát a két pont között
     double calculateDistance(Cell a, Cell b) {
-        return manhattanDistance(a, b);
+        return octileDistance(a, b);
     }
 
+    /// Érme költése
     double cCost(Cell cell) {
         int nearestCoinIndex = nearestCoinIndex(cell);
         if (0 <= nearestCoinIndex) {
@@ -235,30 +225,36 @@ public class Agent extends RaceTrackPlayer {
         return 0;
     }
 
+    /// Egyetlen lépés költsége: Hagyományosan a szülő és a gyerek távolsága,
+    // de a feladat szerint konstans 1 minden lépés költsége, a méretétől függetlenül
     private double wCost(Node node) {
+        //return calculateDistance(node.cell, node.parent.cell);
         return 1;
     }
 
-    /// Distance from end node
+    /// A cella és a cél távolsága
     private double hCost(Cell cell, Cell finish) {
-        double distance = calculateDistance(cell, finish);
-        return distance;
+        return calculateDistance(cell, finish);
     }
 
-    /// Sum of Costs
+    /// Költségek összege
+    // TODO: ezt újra használatba venni
     private double fCost(Node node, Cell finish) {
         double hCost = hCost(node.cell, finish);
         return node.gCost + hCost;
     }
 
-    List<Node> getNeighbours(Node current) {
+    /// Az adott cellából a következő lépésben elérhető cellákat adja vissza
+    List<Node> getNeighbours(Node node) {
         List<Node> neighbours = new LinkedList<>();
 
         for (Direction direction : DIRECTIONS) {
-            int i = current.cell.i + direction.i;
-            int j = current.cell.j + direction.j;
-            Node neighbor = new Node(i, j, current);
-            if (isNotWall(i, j, track) && !current.equals(neighbor)) neighbours.add(neighbor);
+            int i = node.cell.i + direction.i;
+            int j = node.cell.j + direction.j;
+            Node neighbor = new Node(i, j, node);
+
+            // A falak és az eredeti cella nem kerül a listába
+            if (isNotWall(i, j, track) && !node.equals(neighbor)) neighbours.add(neighbor);
         }
         return neighbours;
     }
@@ -267,6 +263,7 @@ public class Agent extends RaceTrackPlayer {
         return true;
     }
 
+    /// A* útkereső algoritmussal keres hatékony utat a két cella között
     private LinkedList<Cell> FindPath(Cell startCell, Cell finishCell) {
         /// A nyitott Node-ok tároljója, fCost szerint növekvő sorrendberendezve.
         PriorityQueue<Node> open = new PriorityQueue<>();
@@ -289,7 +286,7 @@ public class Agent extends RaceTrackPlayer {
             if (isFinnish(current.cell))
                 return reconstructPathPlayerState(current);
 
-            // Ha ráfutottunk egy Coin-ra töröljük a még nem érintett Coin-ok listájából
+            // Ha ráfutottunk egy Coin-ra töröljük a meg nem érintett Coin-ok listájából
             if (isCoin(current.cell))
                 removeCoin(current.cell);
 
@@ -321,12 +318,16 @@ public class Agent extends RaceTrackPlayer {
                     neighbour.hCost = hCost(neighbour.cell, finishCell);
                     neighbour.fCost = (gCostWeight * neighbour.gCost) + neighbour.hCost;
 
-                    neighbour.setParent(current);
+                    neighbour.parent = current;
 
-                    // update or add neighbour to open list
+                    /* Ha nem frissítem a nyílt halmazban lévő elemet, jobb az eredmény
                     if (open.contains(neighbour))
                         open.remove(neighbour);
                     open.add(neighbour);
+                    */
+
+                    if (!open.contains(neighbour))
+                        open.add(neighbour);
                 }
 
             }
