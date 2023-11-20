@@ -308,8 +308,13 @@ public class Agent extends RaceTrackPlayer {
                 return reconstructPathPlayerState(current);
 
             // Ha ráfutottunk egy Coin-ra töröljük a meg nem érintett Coin-ok listájából
-            if (isCoin(current.cell))
+            if (isCoin(current.cell)) {
                 removeCoin(current.cell);
+                /* TODO: kiprobálni
+                ötlet: ha velvesz egy coin-t törli a már bejárt cellák listáját
+                closed.clear();
+                */
+            }
 
 
             List<Node> neighbours = getNeighbours(current);
@@ -328,13 +333,6 @@ public class Agent extends RaceTrackPlayer {
                 // check if the neighbor has not been inspected yet, or
                 // can be reached with smaller cost from the current node
                 if (!open.contains(neighbour) || nextGCost < neighbour.gCost) {
-
-                    /* Cost-ok beállítása
-                    neighbour.cCost = cCost(neighbour.cell);
-                    if (isCoin(neighbour.cell)) {
-                        neighbour.cCost += notCollectedCoins.get(findCoinIndex(neighbour.cell)).value;
-                    }
-                    */
                     neighbour.gCost = nextGCost; // + neighbour.cCost;
                     neighbour.hCost = hCost(neighbour.cell, finishCell);
                     neighbour.cCost = cCost(neighbour.cell);
