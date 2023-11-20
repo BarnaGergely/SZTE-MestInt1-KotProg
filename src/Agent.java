@@ -216,17 +216,34 @@ public class Agent extends RaceTrackPlayer {
         return octileDistance(a, b);
     }
 
-    /// Érme költése
+    // Érme költség számoló
     double cCost(Cell cell) {
+        return cCostSumAvaliable(cell);
+    }
+
+    /// Legközelebbi érme költsége
+    double cCostNearest(Cell cell) {
         double nearestCoinIndex = nearestCoinIndex(cell);
         if (0 <= nearestCoinIndex) {
             // a legközelebbi coin értéke osztva a (távolságával + 1) - azért kell a plusz egy hogy sose lehessen 0 a távolság és
             // csak akkor adjon max pontot, ha konkrátan rálépünk a coin-ra
             // TODO: ha elég átmenni a coin felett, újra át kell kondlni ezt
-            return notCollectedCoins.get(nearestCoinIndex).value / (calculateDistance(cell, notCollectedCoins.get(nearestCoinIndex) + 1));
+            return notCollectedCoins.get(nearestCoinIndex).value / (calculateDistance(cell, notCollectedCoins.get(nearestCoinIndex)) + 1);
         }
         return 0;
     }
+
+        /// Összes még nem érintett érme távolság szerint súlyozott költsége összeadva
+        double cCostSumAvaliable(Cell cell) {
+            double cCost = 0;
+            
+            for(Coin coin : notCollectedCoins) {
+                // a legközelebbi coin értéke osztva a (távolságával + 1) - azért kell a plusz egy hogy sose lehessen 0 a távolság és
+                // csak akkor adjon max pontot, ha konkrátan rálépünk a coin-ra
+                cCost +=  coin.value / (calculateDistance(cell, coin.cell) + 1);
+            }
+            return cCost;
+        }
 
     /// Egyetlen lépés költsége: Hagyományosan a szülő és a gyerek távolsága,
     // de a feladat szerint konstans 1 minden lépés költsége, a méretétől függetlenül
