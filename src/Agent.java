@@ -218,9 +218,12 @@ public class Agent extends RaceTrackPlayer {
 
     /// Érme költése
     double cCost(Cell cell) {
-        int nearestCoinIndex = nearestCoinIndex(cell);
+        double nearestCoinIndex = nearestCoinIndex(cell);
         if (0 <= nearestCoinIndex) {
-            return calculateDistance(cell, notCollectedCoins.get(nearestCoinIndex));
+            // a legközelebbi coin értéke osztva a (távolságával + 1) - azért kell a plusz egy hogy sose lehessen 0 a távolság és
+            // csak akkor adjon max pontot, ha konkrátan rálépünk a coin-ra
+            // TODO: ha elég átmenni a coin felett, újra át kell kondlni ezt
+            return notCollectedCoins.get(nearestCoinIndex).value / (calculateDistance(cell, notCollectedCoins.get(nearestCoinIndex) + 1));
         }
         return 0;
     }
@@ -274,7 +277,8 @@ public class Agent extends RaceTrackPlayer {
         Node startNode = new Node(startCell, null);
         startNode.gCost = 0;
         startNode.hCost = hCost(startNode.cell, finishCell);
-        startNode.fCost = startNode.gCost + startNode.hCost;
+        startNode.cCost = cCost(startNode.cell);
+        startNode.fCost = startNode.gCost + startNode.hCost + startNode.cCost;
         open.add(startNode);    // Hozzá adjuk a kiindulási Node-ot a nyitott halmazhoz
 
         // Amíg van elem a nyitott halmazban
@@ -316,7 +320,8 @@ public class Agent extends RaceTrackPlayer {
                     */
                     neighbour.gCost = nextGCost; // + neighbour.cCost;
                     neighbour.hCost = hCost(neighbour.cell, finishCell);
-                    neighbour.fCost = (gCostWeight * neighbour.gCost) + neighbour.hCost;
+                    neighbour.cCost = cCost(neighbour.cell);
+                    neighbour.fCost = (gCostWeight * neighbour.gCost) + neighbour.hCost + neighbour.cCost;
 
                     neighbour.parent = current;
 
