@@ -18,7 +18,8 @@ public class AgentSimple extends RaceTrackPlayer {
         super(state, random, track, coins, color);
 
         Cell start = new Cell(state.i, state.j);
-        path = FindPath(start, findFinish());
+        path.addAll( FindPath(start, coins[0])); // elmegy az 1. coin-hoz
+        path.addAll( FindPath(coins[0], findFinish())); // az első coin-tól meg a célba
     }
 
     @Override
@@ -215,6 +216,12 @@ public class AgentSimple extends RaceTrackPlayer {
 
     private LinkedList<Cell> reconstructPathPlayerState(Node node) {
         LinkedList<Cell> pathRec = new LinkedList<>();
+
+        int vi = node.cell.i - node.parent.cell.i;
+        int vj = node.cell.j - node.parent.cell.j;
+        if (vi != 0 || vj != 0) {
+            node = new Node(node.cell, node);
+        }
 
         while (node.parent != null) {
             pathRec.addFirst(node.cell);
