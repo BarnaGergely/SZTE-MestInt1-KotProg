@@ -28,7 +28,7 @@ A_Star(start,cel,heurisztikak){
    openSet += start;
    
    while openSet is not empty {
-      current = the node in openSet having the lowest fScore[] value,
+      current = the nodeState in openSet having the lowest fScore[] value,
       if (current = cel) return reconstruct_path(cameFrom, current);
       
       openSet.Remove(current);

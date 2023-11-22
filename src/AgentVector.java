@@ -54,14 +54,14 @@ További segédletek a kötelező programhoz: https://barnagergely.github.io/kal
  *
  * */
 
-public class Agent extends RaceTrackPlayer {
+public class AgentVector extends RaceTrackPlayer {
     LinkedList<Cell> path = new LinkedList<>();
 
     List<Coin> notCollectedCoins = new ArrayList<Coin>();
 
     double gCostWeight = 1;
 
-    public Agent(PlayerState state, Random random, int[][] track, Coin[] coins, int color) {
+    public AgentVector(PlayerState state, Random random, int[][] track, Coin[] coins, int color) {
         super(state, random, track, coins, color);
         for (Coin coin : coins) {
             assert notCollectedCoins != null;
@@ -69,16 +69,26 @@ public class Agent extends RaceTrackPlayer {
         }
 
         Cell start = new Cell(state.i, state.j);
-        LinkedList<Cell> tempPath = FindPath(start, findFinish());
-        assert tempPath != null;
+        Cell finish;
+        /*
+        while (!notCollectedCoins.isEmpty()) {
+            finish = notCollectedCoins.get(nearestCoinIndex(start));
+            path.addAll(FindPath(start, finish));
+            start = finish;
+        }
+        */
+
+        finish = findFinish();
+        LinkedList<Cell> tempPath = FindPath(new PlayerState(start.i, start.j, 0, 0), finish);
         if (isNeitherWall(tempPath, track)) {
-            path.addAll(tempPath);
+            assert tempPath != null;
+            path = tempPath;
         }
     }
 
-    private static class Node implements Comparable<Node> {
-        Cell cell;
-        Node parent;
+    private static class NodeState implements Comparable<NodeState> {
+        PlayerState state;
+        NodeState parent;
 
         /// Sum of costs
         private double fCost = Double.MAX_VALUE;
@@ -91,17 +101,17 @@ public class Agent extends RaceTrackPlayer {
         /// Distance between parent and current cell
         double wCost = 1;
 
-        public Node(Cell cell, Node parent) {
-            this.cell = cell;
+        public NodeState(PlayerState state, NodeState parent) {
+            this.state = state;
             this.parent = parent;
         }
 
-        public Node(int i, int j, Node parent) {
-            this(new Cell(i, j), parent);
+        public NodeState(int i, int j, int vi, int vj, NodeState parent) {
+            this(new PlayerState(i, j, vi, vj), parent);
         }
 
         @Override
-        public int compareTo(Node o) {
+        public int compareTo(NodeState o) {
             return Double.compare(fCost, o.fCost);
         }
 
@@ -109,13 +119,13 @@ public class Agent extends RaceTrackPlayer {
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            Node node = (Node) o;
-            return cell.same(node.cell);
+            NodeState nodeState = (NodeState) o;
+            return state.same(nodeState.state);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(cell);
+            return Objects.hash(state);
         }
     }
 
@@ -205,40 +215,10 @@ public class Agent extends RaceTrackPlayer {
     double calculateDistance(Cell a, Cell b) {
         return euclideanDistance(a, b);
     }
-    /*
-    // Érme költség számoló
-    double cCost(Cell cell) {
-        return cCostSumAvaliable(cell);
-    }
-
-    /// Legközelebbi érme költsége
-    double cCostNearest(Cell cell) {
-        int nearestCoinIndex = nearestCoinIndex(cell);
-        if (0 <= nearestCoinIndex) {
-            // a legközelebbi coin értéke osztva a (távolságával + 1) - azért kell a plusz egy hogy sose lehessen 0 a távolság és
-            // csak akkor adjon max pontot, ha konkrátan rálépünk a coin-ra
-            // TODO: ha elég átmenni a coin felett, újra át kell kondlni ezt
-            return notCollectedCoins.get(nearestCoinIndex).value / (calculateDistance(cell, notCollectedCoins.get(nearestCoinIndex)) + 1);
-        }
-        return 0;
-    }
-
-    /// Összes még nem érintett érme távolság szerint súlyozott költsége összeadva
-    double cCostSumAvaliable(Cell cell) {
-        double cCost = 0;
-
-        for(Coin coin : notCollectedCoins) {
-            // a legközelebbi coin értéke osztva a (távolságával + 1) - azért kell a plusz egy hogy sose lehessen 0 a távolság és
-            // csak akkor adjon max pontot, ha konkrátan rálépünk a coin-ra
-            cCost +=  coin.value / (calculateDistance(cell, coin) + 1);
-        }
-        return cCost;
-    }
-    */
 
     /// Egyetlen lépés költsége: Hagyományosan a szülő és a gyerek távolsága,
     // de a feladat szerint konstans 1 minden lépés költsége, a méretétől függetlenül
-    private double wCost(Node node) {
+    private double wCost(NodeState nodeState) {
         //return calculateDistance(node.cell, node.parent.cell);
         return 1;
     }
@@ -250,82 +230,74 @@ public class Agent extends RaceTrackPlayer {
 
     /// Költségek összege
     // TODO: ezt újra használatba venni
-    private double fCost(Node node, Cell finish) {
-        double hCost = hCost(node.cell, finish);
-        return node.gCost + hCost;
+    private double fCost(NodeState nodeState, Cell finish) {
+        double hCost = hCost(toCell(nodeState.state), finish);
+        return nodeState.gCost + hCost;
     }
 
     /// Az adott cellából a következő lépésben elérhető cellákat adja vissza
-    List<Node> getNeighbours(Node node) {
-        List<Node> neighbours = new LinkedList<>();
+    List<NodeState> getNeighbours(NodeState nodeState) {
+        List<NodeState> neighbours = new LinkedList<>();
 
         for (Direction direction : DIRECTIONS) {
-            int i = node.cell.i + direction.i;
-            int j = node.cell.j + direction.j;
-            Node neighbor = new Node(i, j, node);
-
-            // sebesség vektor számítások a szomszéd validáslásához
-            int parentVi = 0;
-            int parentVj = 0;
-            int myVi = 0;
-            int myVj = 0;
-            if (neighbor.parent == null) {
-
-            } else if (neighbor.parent.parent == null) {
-                myVi = neighbor.cell.i - neighbor.parent.cell.i;
-                myVj = neighbor.cell.j - neighbor.parent.cell.j;
-            } else {
-                parentVi = neighbor.parent.cell.i - neighbor.parent.parent.cell.i;
-                parentVj = neighbor.parent.cell.j - neighbor.parent.parent.cell.j;
-                myVi = neighbor.cell.i - neighbor.parent.cell.i;
-                myVj = neighbor.cell.j - neighbor.parent.cell.j;
+            int vi = nodeState.state.vi + direction.i;
+            if (vi > 1) {
+                vi = 1;
+            } else if (vi < -1) {
+                vi = -1;
             }
+            int vj = nodeState.state.vj + direction.j;
+            if (vj > 1) {
+                vj = 1;
+            } else if (vj < -1) {
+                vj = -1;
+            }
+            int i = nodeState.state.i + vi;
+            int j = nodeState.state.j + vj;
+
+            NodeState neighbor = new NodeState(i, j, vi, vj, nodeState);
 
             // A falak és az eredeti cella nem kerül a listába
-            if (!isNotWall(i, j, track) || node.equals(neighbor)) continue;
-
-            // Azok a szomszédok, amikbe a jelenlegi sebességünk miatt nem lehet eljutni, kiszűrése
-            if (1 < Math.abs(myVi - parentVi) || 1 < Math.abs(myVj - parentVj)) continue;
-
-            neighbours.add(neighbor);
+            if (!nodeState.equals(neighbor) && isNotWall(i, j, track) && i < track.length && j < track[0].length)
+                neighbours.add(neighbor);
         }
         return neighbours;
     }
 
     boolean traversable(Cell from, Cell to) {
-        return true;
+        return isNeitherWall(lineCrossing(from, to), track);
     }
 
     /// A* útkereső algoritmussal keres hatékony utat a két cella között
-    private LinkedList<Cell> FindPath(Cell startCell, Cell finishCell) {
+    private LinkedList<Cell> FindPath(PlayerState startState, Cell finishCell) {
         /// A nyitott Node-ok tároljója, fCost szerint növekvő sorrendberendezve.
-        PriorityQueue<Node> open = new PriorityQueue<>();
+        PriorityQueue<NodeState> open = new PriorityQueue<>();
         /// Már lezárt Node-ok halmaza. Nem kell rendezni, de gyors keresésre, beszúrásra és törlésre van benne szükség
-        LinkedList<Node> closed = new LinkedList<>();
+        LinkedList<NodeState> closed = new LinkedList<>();
 
         /// Kiidulási Node
-        Node startNode = new Node(startCell, null);
-        startNode.gCost = 0;
-        startNode.hCost = hCost(startNode.cell, finishCell);
-        startNode.fCost = startNode.gCost + startNode.hCost;
-        open.add(startNode);    // Hozzá adjuk a kiindulási Node-ot a nyitott halmazhoz
+        NodeState startNodeState = new NodeState(startState, null);
+        startNodeState.gCost = 0;
+        startNodeState.hCost = hCost(toCell(startNodeState.state), finishCell);
+        startNodeState.fCost = startNodeState.gCost + startNodeState.hCost;
+        open.add(startNodeState);    // Hozzá adjuk a kiindulási Node-ot a nyitott halmazhoz
 
         // Amíg van elem a nyitott halmazban
         while (!open.isEmpty()) {
-            Node current = open.poll(); // az open első eleme a legkisebb, így ez a legjobb ismert lehetséges lépés
+            NodeState current = open.poll(); // az open első eleme a legkisebb, így ez a legjobb ismert lehetséges lépés
             closed.add(current);
 
             // ha ráfutottunk egy cél cellára, leáll az algoritmus
-            if (current.cell.same(finishCell))
+            if (toCell(current.state).same(finishCell))
                 return reconstructPathPlayerState(current);
 
-            List<Node> neighbours = getNeighbours(current);
+            List<NodeState> neighbours = getNeighbours(current);
             // Végig járjuk a lehetséges lépéseket, ahová a következő körben léphetünk
-            for (Node neighbour : neighbours) {
+            for (NodeState neighbour : neighbours) {
 
                 // Ha már kizártuk vagy el sem lehet menni az adott szomszédba, ugorjuk át
                 // ezt be lehetne integrálni a getNeighbours metódusba
-                if (!traversable(current.cell, neighbour.cell) || closed.contains(neighbour)) {
+                if (!traversable(toCell(current.state), toCell(neighbour.state)) || closed.contains(neighbour)) {
                     continue;
                 }
 
@@ -336,7 +308,7 @@ public class Agent extends RaceTrackPlayer {
                 // can be reached with smaller cost from the current node
                 if (!open.contains(neighbour) || nextGCost < neighbour.gCost) {
                     neighbour.gCost = nextGCost; // + neighbour.cCost;
-                    neighbour.hCost = hCost(neighbour.cell, finishCell);
+                    neighbour.hCost = hCost(toCell(neighbour.state), finishCell);
                     neighbour.fCost = (gCostWeight * neighbour.gCost) + neighbour.hCost;
 
                     neighbour.parent = current;
@@ -357,25 +329,25 @@ public class Agent extends RaceTrackPlayer {
         return null;
     }
 
-    private LinkedList<Cell> reconstructPathPlayerState(Node node) {
-        LinkedList<Node> debugPath = new LinkedList<>();
+    private LinkedList<Cell> reconstructPathPlayerState(NodeState nodeState) {
+        LinkedList<NodeState> debugPath = new LinkedList<>();
         LinkedList<Cell> pathRec = new LinkedList<>();
 
-        while (node.parent != null) {
-            pathRec.addFirst(node.cell);
-            debugPath.addFirst(node);
-            node = node.parent;
+        while (nodeState != null) {
+            pathRec.addFirst(toCell(nodeState.state));
+            debugPath.addFirst(nodeState);
+            nodeState = nodeState.parent;
         }
         return pathRec;
     }
 
     private Direction moveToCell(Cell cell) {
         // Player i + vi + x = cell.i
-        int i = cell.i - state.i - state.vi;
-        int j = cell.j - state.j - state.vj;
-        if (i > 1 || i < -1 || j > 1 || j < -1)
+        int vi = cell.i - (state.i + state.vi);
+        int vj = cell.j - (state.j + state.vj);
+        if (vi > 1 || vi < -1 || vj > 1 || vj < -1)
             return null;
-        Direction direction = new Direction(i, j);
+        Direction direction = new Direction(vi, vj);
         return direction;
     }
 
@@ -384,6 +356,8 @@ public class Agent extends RaceTrackPlayer {
         if (path != null && !path.isEmpty()) {
             Cell nextStep = path.getFirst();
             path.removeFirst();
+            if (!traversable(new Cell(state.i, state.j), nextStep))
+                return null;
             return moveToCell(nextStep);
         } else {
             return null;
