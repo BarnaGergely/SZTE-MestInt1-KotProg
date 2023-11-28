@@ -18,8 +18,8 @@ public class AgentSimple extends RaceTrackPlayer {
         super(state, random, track, coins, color);
 
         Cell start = new Cell(state.i, state.j);
-        path.addAll( FindPath(start, coins[0])); // elmegy az 1. coin-hoz
-        path.addAll( FindPath(coins[0], findFinish())); // az első coin-tól meg a célba
+        path.addAll(FindPath(start, coins[0])); // elmegy az 1. coin-hoz
+        path.addAll(FindPath(coins[0], findFinish())); // az első coin-tól meg a célba
     }
 
     @Override
@@ -69,6 +69,12 @@ public class AgentSimple extends RaceTrackPlayer {
                 // A szomszéd új g értéke
                 double nextGCost = current.gCost + wCost(neighbour);
 
+
+                /* bug1: neighbour.gCost always infinit,
+                    because the gCost is not set in the getPossibleNodes functions */
+                /* Possible improvement: if the step cost (wCost) is the same everywhere,
+                    the first path to a Node is always the sorties, so the check is not required */
+
                 // check if the neighbor has not been inspected yet, or
                 // can be reached with smaller cost from the current node
                 if (!open.contains(neighbour) || nextGCost < neighbour.gCost) {
@@ -78,7 +84,7 @@ public class AgentSimple extends RaceTrackPlayer {
 
                     neighbour.parent = current;
 
-                    /* Ha nem frissítem a nyílt halmazban lévő elemet, jobb az eredmény
+                    /* Ha nem frissítem a nyílt halmazban lévő elemet, jobb az eredmény, vélhetően a bug1 miatt
                     if (open.contains(neighbour))
                         open.remove(neighbour);
                     open.add(neighbour);

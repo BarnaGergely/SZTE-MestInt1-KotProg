@@ -1,0 +1,18 @@
+
+        LinkedList<Cell> tempPath = new LinkedList<>();
+
+        PlayerState start = state;
+
+        while (!notCollectedCoins.isEmpty()) {
+            Cell coin = notCollectedCoins.get(nearestCoinIndex(toCell(start)));
+            Pair<LinkedList<Cell>, PlayerState> pair = FindPath(start, findFinish());
+            assert pair != null;
+            tempPath.addAll(Objects.requireNonNull(pair.first));
+            start = pair.second;
+            removeCoin(coin);
+        }
+
+        tempPath.addAll( Objects.requireNonNull(FindPath(start, findFinish())).first);
+        if (isNeitherWall(tempPath, track)) {
+            path = tempPath;
+        }

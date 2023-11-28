@@ -10,7 +10,7 @@ import java.util.*;
 
 import static game.racetrack.RaceTrackGame.*;
 
-/* A projekt a racetrack-10-30-as verzióját integrálja
+/* A projekt a racetrack-11-20-as verzióját integrálja
 
     * Be van állítva a Run Config, így pöccre indul grafikus
       felülettel az alkalmazás és működik a debug is
@@ -63,13 +63,21 @@ public class Agent extends RaceTrackPlayer {
 
     public Agent(PlayerState state, Random random, int[][] track, Coin[] coins, int color) {
         super(state, random, track, coins, color);
-        for (Coin coin : coins) {
-            assert notCollectedCoins != null;
-            notCollectedCoins.add(coin);
-        }
+        notCollectedCoins.addAll(Arrays.asList(coins));
 
         Cell start = new Cell(state.i, state.j);
-        LinkedList<Cell> tempPath = FindPath(start, findFinish());
+        LinkedList<Cell> tempPath = new LinkedList<>();
+        while (!notCollectedCoins.isEmpty()) {
+            Coin coin = notCollectedCoins.get(nearestCoinIndex(start));
+            long begin = System.currentTimeMillis();
+            tempPath.addAll(FindPath(start, coin));
+            long end = System.currentTimeMillis();
+            double duration = (double) (end - begin) / 1000;
+            start = coin;
+            removeCoin(coin);
+        }
+        tempPath.addAll(FindPath(start, findFinish()));
+
         assert tempPath != null;
         if (isNeitherWall(tempPath, track)) {
             path.addAll(tempPath);
@@ -137,7 +145,7 @@ public class Agent extends RaceTrackPlayer {
 
     private boolean isCoin(Cell cell) {
         for (Coin coin : notCollectedCoins) {
-            if (coin.same(cell)) return true;
+            if (calculateDistance(cell, coin) <= 2) return true;
         }
         return false;
     }
@@ -162,6 +170,11 @@ public class Agent extends RaceTrackPlayer {
 
         }
         return false;
+    }
+
+    private boolean removeCoin(int i) {
+        notCollectedCoins.remove(i);
+        return true;
     }
 
     int nearestCoinIndex(Cell cell) {
@@ -203,7 +216,7 @@ public class Agent extends RaceTrackPlayer {
 
     /// A megadott algoritmussal kiszámolja az egyenes út hosszát a két pont között
     double calculateDistance(Cell a, Cell b) {
-        return euclideanDistance(a, b);
+        return manhattanDistance(a, b);
     }
     /*
     // Érme költség számoló
@@ -245,7 +258,20 @@ public class Agent extends RaceTrackPlayer {
 
     /// A cella és a cél távolsága
     private double hCost(Cell cell, Cell finish) {
-        return calculateDistance(cell, finish);
+        double cCoin = 0;
+        // ha van egy Coin 10 közelségben, menjünk rá, egyébként irány a cél
+        if (notCollectedCoins != null && !notCollectedCoins.isEmpty()) {
+            Coin nearestCoin = notCollectedCoins.get(nearestCoinIndex(cell));
+            double distance = calculateDistance(cell, nearestCoin);
+            if (distance < 10) {
+                List<Cell> coinPath = lineCrossing(cell, nearestCoin);
+                if (isNeitherWall(coinPath, track)) {
+                    cCoin = nearestCoin.value / distance;
+                }
+            }
+        }
+
+        return calculateDistance(cell, finish) - 10 * cCoin;
     }
 
     /// Költségek összege
@@ -297,7 +323,8 @@ public class Agent extends RaceTrackPlayer {
     }
 
     /// A* útkereső algoritmussal keres hatékony utat a két cella között
-    private LinkedList<Cell> FindPath(Cell startCell, Cell finishCell) {
+    private LinkedList<Cell> FindPath(Cell startCell, Cell inputFinishCell) {
+        Cell finishCell = inputFinishCell;
         /// A nyitott Node-ok tároljója, fCost szerint növekvő sorrendberendezve.
         PriorityQueue<Node> open = new PriorityQueue<>();
         /// Már lezárt Node-ok halmaza. Nem kell rendezni, de gyors keresésre, beszúrásra és törlésre van benne szükség
@@ -361,7 +388,17 @@ public class Agent extends RaceTrackPlayer {
         LinkedList<Node> debugPath = new LinkedList<>();
         LinkedList<Cell> pathRec = new LinkedList<>();
 
+        int vi = node.cell.i - node.parent.cell.i;
+        int vj = node.cell.j - node.parent.cell.j;
+        if (vi != 0 || vj != 0) {
+            node = new Node(node.cell, node);
+        }
+
         while (node.parent != null) {
+            // Ha ráfutottunk egy Coin-ra töröljük a még nem érintett Coin-ok listájából
+            if (isCoin(node.cell))
+                removeCoin(nearestCoinIndex(node.cell));
+
             pathRec.addFirst(node.cell);
             debugPath.addFirst(node);
             node = node.parent;

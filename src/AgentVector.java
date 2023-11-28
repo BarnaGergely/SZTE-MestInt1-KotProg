@@ -79,7 +79,10 @@ public class AgentVector extends RaceTrackPlayer {
         */
 
         finish = findFinish();
+        long begin = System.currentTimeMillis();
         LinkedList<Cell> tempPath = FindPath(new PlayerState(start.i, start.j, 0, 0), finish);
+        long end = System.currentTimeMillis();
+        double duration = (double) (end - begin) /1000;
         if (isNeitherWall(tempPath, track)) {
             assert tempPath != null;
             path = tempPath;
@@ -120,7 +123,8 @@ public class AgentVector extends RaceTrackPlayer {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             NodeState nodeState = (NodeState) o;
-            return state.same(nodeState.state);
+            //return state.same(nodeState.state);
+            return state.i == nodeState.state.i && state.j == nodeState.state.j;
         }
 
         @Override
@@ -236,30 +240,38 @@ public class AgentVector extends RaceTrackPlayer {
     }
 
     /// Az adott cellából a következő lépésben elérhető cellákat adja vissza
-    List<NodeState> getNeighbours(NodeState nodeState) {
+    List<NodeState> getNeighbours(NodeState nodeState, ArrayList<NodeState> known) {
         List<NodeState> neighbours = new LinkedList<>();
 
         for (Direction direction : DIRECTIONS) {
             int vi = nodeState.state.vi + direction.i;
+            int vj = nodeState.state.vj + direction.j;
+
+
             if (vi > 1) {
                 vi = 1;
             } else if (vi < -1) {
                 vi = -1;
             }
-            int vj = nodeState.state.vj + direction.j;
             if (vj > 1) {
                 vj = 1;
             } else if (vj < -1) {
                 vj = -1;
             }
+
+
             int i = nodeState.state.i + vi;
             int j = nodeState.state.j + vj;
 
             NodeState neighbor = new NodeState(i, j, vi, vj, nodeState);
 
             // A falak és az eredeti cella nem kerül a listába
-            if (!nodeState.equals(neighbor) && isNotWall(i, j, track) && i < track.length && j < track[0].length)
-                neighbours.add(neighbor);
+            if (!(!nodeState.equals(neighbor) && isNotWall(i, j, track) && i < track.length && j < track[0].length))
+                continue;
+            int index = known.indexOf(neighbor);
+            if (index>-1) neighbor = known.get(index);
+
+            neighbours.add(neighbor);
         }
         return neighbours;
     }
@@ -274,6 +286,7 @@ public class AgentVector extends RaceTrackPlayer {
         PriorityQueue<NodeState> open = new PriorityQueue<>();
         /// Már lezárt Node-ok halmaza. Nem kell rendezni, de gyors keresésre, beszúrásra és törlésre van benne szükség
         LinkedList<NodeState> closed = new LinkedList<>();
+        ArrayList<NodeState> known = new ArrayList<>();
 
         /// Kiidulási Node
         NodeState startNodeState = new NodeState(startState, null);
@@ -281,6 +294,7 @@ public class AgentVector extends RaceTrackPlayer {
         startNodeState.hCost = hCost(toCell(startNodeState.state), finishCell);
         startNodeState.fCost = startNodeState.gCost + startNodeState.hCost;
         open.add(startNodeState);    // Hozzá adjuk a kiindulási Node-ot a nyitott halmazhoz
+        known.add(startNodeState);
 
         // Amíg van elem a nyitott halmazban
         while (!open.isEmpty()) {
@@ -291,7 +305,7 @@ public class AgentVector extends RaceTrackPlayer {
             if (toCell(current.state).same(finishCell))
                 return reconstructPathPlayerState(current);
 
-            List<NodeState> neighbours = getNeighbours(current);
+            List<NodeState> neighbours = getNeighbours(current, known);
             // Végig járjuk a lehetséges lépéseket, ahová a következő körben léphetünk
             for (NodeState neighbour : neighbours) {
 
@@ -313,14 +327,23 @@ public class AgentVector extends RaceTrackPlayer {
 
                     neighbour.parent = current;
 
-                    /* Ha nem frissítem a nyílt halmazban lévő elemet, jobb az eredmény
+
+                    // Ha nem frissítem a nyílt halmazban lévő elemet, jobb az eredmény
                     if (open.contains(neighbour))
                         open.remove(neighbour);
                     open.add(neighbour);
-                    */
 
+
+
+                    /*
                     if (!open.contains(neighbour))
                         open.add(neighbour);
+
+                     */
+
+                    if (known.contains(neighbour))
+                        known.remove(neighbour);
+                    known.add(neighbour);
                 }
 
             }
