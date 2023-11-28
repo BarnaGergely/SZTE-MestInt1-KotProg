@@ -70,9 +70,9 @@ public class AgentSimple extends RaceTrackPlayer {
                 double nextGCost = current.gCost + wCost(neighbour);
 
 
-                /* bug1: neighbour.gCost always infinit,
+                /* TODO: bug1: neighbour.gCost always infinit,
                     because the gCost is not set in the getPossibleNodes functions */
-                /* Possible improvement: if the step cost (wCost) is the same everywhere,
+                /* TODO: Possible improvement: if the step cost (wCost) is the same everywhere,
                     the first path to a Node is always the sorties, so the check is not required */
 
                 // check if the neighbor has not been inspected yet, or
