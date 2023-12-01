@@ -39,13 +39,12 @@ public class AgentMinimal extends RaceTrackPlayer {
 
     @Override
     public Direction getDirection(long remainingTime) {
-        Cell current = new Cell(state.i, state.j);
         Cell next = path.getFirst();
 
-        Direction speedChange = direction(current, next);
-        int nextVi = speedChange.i-state.vi;
-        int NextVj = speedChange.j-state.vj;
+        int nextVi = next.i-state.i-state.vi;
+        int NextVj = next.j-state.j-state.vj;
 
+        // limitálja a sebességet és javítja nem valami effektíven az útvonal tervező hibáját
         int speedLimit = 1;
         boolean speedLimitExceeded = false;
         if (abs(nextVi) > speedLimit) {
