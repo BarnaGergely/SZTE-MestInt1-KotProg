@@ -41,22 +41,22 @@ public class AgentMinimal extends RaceTrackPlayer {
     public Direction getDirection(long remainingTime) {
         Cell next = path.getFirst();
 
-        int nextVi = next.i-state.i-state.vi;
-        int NextVj = next.j-state.j-state.vj;
+        int nextDi = next.i-(state.i+state.vi);
+        int NextDj = next.j-(state.j+state.vj);
 
         // limitálja a sebességet és javítja nem valami effektíven az útvonal tervező hibáját
         int speedLimit = 1;
         boolean speedLimitExceeded = false;
-        if (abs(nextVi) > speedLimit) {
-            nextVi = nextVi > 0 ? speedLimit : -speedLimit;
+        if (abs(nextDi) > speedLimit) {
+            nextDi = nextDi > 0 ? speedLimit : -speedLimit;
             speedLimitExceeded = true;
         }
-        if (abs(NextVj) > speedLimit) {
-            NextVj = NextVj > 0 ? speedLimit : -speedLimit;
+        if (abs(NextDj) > speedLimit) {
+            NextDj = NextDj > 0 ? speedLimit : -speedLimit;
             speedLimitExceeded = true;
         }
         if (!speedLimitExceeded) path.removeFirst();
 
-        return new Direction(nextVi, NextVj);
+        return new Direction(nextDi, NextDj);
     }
 }
